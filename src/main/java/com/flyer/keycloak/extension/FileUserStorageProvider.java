@@ -37,7 +37,7 @@ public class FileUserStorageProvider implements
     private final FileUserRepository userRepository;
     private final Map<String, UserModel> loadedUsers;
 
-    @Getter private boolean userDataChanged;
+    @Getter private boolean userDataChanged; // flag for user repository persistence, could be implemented in a more granular way
 
     public FileUserStorageProvider(KeycloakSession session, ComponentModel model, FileUserRepository userRepository) {
         this.session = session;
@@ -50,10 +50,13 @@ public class FileUserStorageProvider implements
     /* UserLookupProvider interface implementation (Start) */
     @Override
     public void close() {
-        try {
-            userRepository.persistUserDataToFile();
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (userDataChanged) {
+            log.infov("[UserLookupProvider] Persisting user data changes ...");
+            try {
+                userRepository.persistUserDataToFile();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
         log.infov("[UserLookupProvider] Closing at the end of the transaction.");
     }
@@ -70,17 +73,10 @@ public class FileUserStorageProvider implements
     public UserModel getUserByUsername(String username, RealmModel realm) {
         UserModel adapter = loadedUsers.get(username);
         if (adapter == null) {
-            log.infov("Looking up user via username: username={0} realm={1}", username, realm.getId());
+            log.infov("Looking up user from the repository via username: username={0} realm={1}", username, realm.getId());
             User user = userRepository.getUser(username);
             log.infov("Found user: {0}", user);
             if (user != null) {
-                // very awkward way to save user updates to the external repository from the Keycloak admin console
-//                FileTransaction transaction = new FileTransaction(userRepository, user, this);
-//                if (transaction.getState() == FileTransaction.TransactionState.NOT_STARTED) {
-//                    log.infov("Enlisting user repository transaction ...");
-//                    session.getTransactionManager().enlistAfterCompletion(transaction);
-//                }
-
                 adapter = createAdapter(realm, user);
                 loadedUsers.put(username, adapter);
             }
@@ -205,7 +201,7 @@ public class FileUserStorageProvider implements
         String password = userRepository.getUser(user.getUsername()).getPassword();
 
         if (password == null) return false;
-        return password.equals(cred.getValue());
+        return password.equals(HashUtil.hashString(cred.getValue()));
     }
     /* CredentialInputValidator interface implementation (End) */
 
@@ -285,22 +281,9 @@ public class FileUserStorageProvider implements
         log.infov("Adding new user to file repository: username={0}", username);
         User user = new User();
         user.setUsername(username);
+        user.setPassword(username);
         userRepository.insertUser(user);
-        // to avoid below nasty NullPointerException of lookup calls fired by some part of the Keycloak code which I don't intend to find out
-        //        17:27:04,292 INFO  [com.flyer.keycloak.extension.FileUserStorageProvider] (default task-2) Looking up user via: id=f:f0ff9b6a-8a10-4acd-a98c-16246248e112:null realm=winterfell
-        //        17:27:04,292 INFO  [com.flyer.keycloak.extension.FileUserStorageProvider] (default task-2) Looking up user via username: username=null realm=winterfell
-        //        17:27:04,292 INFO  [com.flyer.keycloak.extension.FileUserStorageProvider] (default task-2) Found user: null
-        //        17:27:04,292 WARN  [org.keycloak.services] (default task-2) KC-SERVICES0013: Failed authentication: org.keycloak.authentication.AuthenticationFlowException
-        //              at org.keycloak.authentication.AuthenticationProcessor.authenticationAction(AuthenticationProcessor.java:876)
-        // [Issue Record] https://stackoverflow.com/questions/56272637/how-do-i-write-a-simple-transaction-wrapper-in-a-keycloak-spi-extension
         UserModel userModel = createAdapter(realm, user);
-
-//        FileTransaction transaction = new FileTransaction(userRepository, user, this);
-//        if (transaction.getState() == FileTransaction.TransactionState.NOT_STARTED) {
-//            log.infov("Enlisting user repository transaction ...");
-//            session.getTransactionManager().enlistAfterCompletion(transaction);
-//        }
-
         return userModel;
     }
 

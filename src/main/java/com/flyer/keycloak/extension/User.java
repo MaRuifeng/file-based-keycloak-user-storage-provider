@@ -31,6 +31,10 @@ public class User {
         this.favouriteLine = favouriteLine;
         this.email = email;
         this.username = this.email.toLowerCase();
-        this.password = this.username;
+        setPassword(this.username);
+    }
+
+    public void setPassword(String password) {
+        this.password = HashUtil.hashString(password);
     }
 }
