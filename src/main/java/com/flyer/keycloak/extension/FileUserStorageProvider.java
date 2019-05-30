@@ -166,8 +166,15 @@ public class FileUserStorageProvider implements
             @Override
             public void setAttribute(String name, List<String> values) {
                 log.infov("[Keycloak UserModel Adapter] Setting attribute {0} with values {1}", name, values);
-                getFederatedStorage().setAttribute(realm, this.getId(), name, values);
-                user.setFavouriteLine(getFirstAttribute("favouriteLine"));
+                switch (name) {
+                    case "favouriteLine":
+                        // purposely skip attribute setting to federatedStorage so it won't
+                        // get captured by Keycloak's local DB and shown via the Admin console
+                        user.setFavouriteLine(values.get(0));
+                        break;
+                    default:
+                        getFederatedStorage().setAttribute(realm, this.getId(), name, values);
+                }
                 userDataChanged = true;
             }
         };
@@ -292,6 +299,7 @@ public class FileUserStorageProvider implements
         log.infov("Removing user: user={0}", user.getUsername());
         try {
             userRepository.removeUser(user.getUsername());
+            userRepository.persistUserDataToFile();
             return true;
         } catch (Exception e) {
             e.printStackTrace();
