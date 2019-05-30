@@ -73,6 +73,8 @@ public class FileUserStorageProvider implements
     public UserModel getUserByUsername(String username, RealmModel realm) {
         UserModel adapter = loadedUsers.get(username);
         if (adapter == null) {
+//            session.userFederatedStorage().getStoredUsers(realm, 0, Integer.MAX_VALUE)
+//                    .stream().forEach(user -> log.infov("Stored user in federated storage: {0}", user));
             log.infov("Looking up user from the repository via username: username={0} realm={1}", username, realm.getId());
             User user = userRepository.getUser(username);
             log.infov("Found user: {0}", user);
