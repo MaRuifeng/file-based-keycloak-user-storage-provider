@@ -33,16 +33,16 @@ public class FileUserStorageProviderFactory implements UserStorageProviderFactor
 
         FileUserRepository userRepository = FileUserRepository.getInstance(userHomeDir + "/" +fileName);
 
-        if (userRepository.getUserCount() == 0) {
-            log.infov("Current user repository is empty. Populating it with some test data ...");
-            User user1 = new User("Jon", "Snow", "jon.snow@winterfell.com", "There is only one war that matters");
-            User user2 = new User("Tyrion", "Lannister", "tyrion.lannister@casterlyrock.com", "I drink and I know things");
-            User user3 = new User("Ygritte", "Snow", "Ygritte@wild.com", "You know nothing");
-
-            userRepository.insertUser(user1);
-            userRepository.insertUser(user2);
-            userRepository.insertUser(user3);
-        }
+//        if (userRepository.getUserCount() == 0) {
+//            log.infov("Current user repository is empty. Populating it with some test data ...");
+//            User user1 = new User("Jon", "Snow", "jon.snow@winterfell.com", "There is only one war that matters");
+//            User user2 = new User("Tyrion", "Lannister", "tyrion.lannister@casterlyrock.com", "I drink and I know things");
+//            User user3 = new User("Ygritte", "Snow", "Ygritte@wild.com", "You know nothing");
+//
+//            userRepository.insertUser(user1);
+//            userRepository.insertUser(user2);
+//            userRepository.insertUser(user3);
+//        }
 
         return new FileUserStorageProvider(session, model, userRepository);
     }

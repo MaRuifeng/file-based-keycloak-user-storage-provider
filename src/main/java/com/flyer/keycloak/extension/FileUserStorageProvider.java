@@ -14,7 +14,6 @@ import org.keycloak.storage.user.UserLookupProvider;
 import org.keycloak.storage.user.UserQueryProvider;
 import org.keycloak.storage.user.UserRegistrationProvider;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -37,28 +36,17 @@ public class FileUserStorageProvider implements
     private final FileUserRepository userRepository;
     private final Map<String, UserModel> loadedUsers;
 
-    @Getter private boolean userDataChanged; // flag for user repository persistence, could be implemented in a more granular way
-
     public FileUserStorageProvider(KeycloakSession session, ComponentModel model, FileUserRepository userRepository) {
         this.session = session;
         this.model = model;
         this.userRepository = userRepository;
         this.loadedUsers = new HashMap<>();
-        this.userDataChanged = false;
     }
 
     /* UserLookupProvider interface implementation (Start) */
     @Override
     public void close() {
-        if (userDataChanged) {
-            log.infov("[UserLookupProvider] Persisting user data changes ...");
-            try {
-                userRepository.persistUserDataToFile();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-        log.infov("[UserLookupProvider] Closing at the end of the transaction.");
+        log.infov("End of transaction.");
     }
 
     @Override
@@ -73,97 +61,90 @@ public class FileUserStorageProvider implements
     public UserModel getUserByUsername(String username, RealmModel realm) {
         UserModel adapter = loadedUsers.get(username);
         if (adapter == null) {
-//            session.userFederatedStorage().getStoredUsers(realm, 0, Integer.MAX_VALUE)
-//                    .stream().forEach(user -> log.infov("Stored user in federated storage: {0}", user));
-            log.infov("Looking up user from the repository via username: username={0} realm={1}", username, realm.getId());
-            User user = userRepository.getUser(username);
-            log.infov("Found user: {0}", user);
-            if (user != null) {
-                adapter = createAdapter(realm, user);
-                loadedUsers.put(username, adapter);
-            }
+            session.userFederatedStorage().getStoredUsers(realm, 0, Integer.MAX_VALUE).stream().forEach(user -> {
+                log.infov("User in federated storage: {0}", user);
+                log.infov("Attributes: {0}", session.userFederatedStorage().getAttributes(realm, user));
+            });
+            adapter = createAdapter(realm, username);
+            loadedUsers.put(username, adapter);
         }
         return adapter;
     }
 
-    private UserModel createAdapter(RealmModel realm, User user) {
+    private UserModel createAdapter(RealmModel realm, String username) {
         return new AbstractUserAdapterFederatedStorage(session, realm, model) { // anonymous class inheriting the abstract parent
             @Override
             public String getUsername() {
                 log.infov("[Keycloak UserModel Adapter] Getting username ....");
-                return user.getUsername();
+                return username;
             }
-
-            @Override
-            public String getFirstName() {
-                log.infov("[Keycloak UserModel Adapter] Getting firstName ....");
-                return user.getFirstName();
-            }
-
-            @Override
-            public String getLastName() {
-                log.infov("[Keycloak UserModel Adapter] Getting lastName ....");
-                return user.getLastName();
-            }
-
+//
+//            @Override
+//            public String getFirstName() {
+//                log.infov("[Keycloak UserModel Adapter] Getting firstName ....");
+//                return user.getFirstName();
+//            }
+//
+//            @Override
+//            public String getLastName() {
+//                log.infov("[Keycloak UserModel Adapter] Getting lastName ....");
+//                return user.getLastName();
+//            }
+//
             @Override
             public String getEmail() {
                 log.infov("[Keycloak UserModel Adapter] Getting email ....");
-                return user.getEmail();
+                return super.getEmail();
             }
-
-            @Override
-            public String getFirstAttribute(String name) {
-                log.infov("[Keycloak UserModel Adapter] Getting first value of attribute {0} ....", name);
-                return getFederatedStorage().getAttributes(realm, this.getId()).getFirst(name);
-            }
-
-            @Override
-            public Map<String, List<String>> getAttributes() {
-                log.infov("[Keycloak UserModel Adapter] Getting all attributes ....");
-                return getFederatedStorage().getAttributes(realm, this.getId());
-            }
-
-            @Override
-            public List<String> getAttribute(String name) {
-                log.infov("[Keycloak UserModel Adapter] Getting values of attribute {0} ....", name);
-                return getFederatedStorage().getAttributes(realm, this.getId()).get(name);
-            }
+//
+//            @Override
+//            public String getFirstAttribute(String name) {
+//                log.infov("[Keycloak UserModel Adapter] Getting first value of attribute {0} ....", name);
+//                return getFederatedStorage().getAttributes(realm, this.getId()).getFirst(name);
+//            }
+//
+//            @Override
+//            public Map<String, List<String>> getAttributes() {
+//                log.infov("[Keycloak UserModel Adapter] Getting all attributes ....");
+//                return getFederatedStorage().getAttributes(realm, this.getId());
+//            }
+//
+//            @Override
+//            public List<String> getAttribute(String name) {
+//                log.infov("[Keycloak UserModel Adapter] Getting values of attribute {0} ....", name);
+//                return getFederatedStorage().getAttributes(realm, this.getId()).get(name);
+//            }
 
             @Override
             public void setUsername(String username) {
                 log.infov("[Keycloak UserModel Adapter] Setting username: {0}", username);
-                user.setUsername(username);
-                userDataChanged = true;
+//                user.setUsername(username);
             }
-
-            @Override
-            public void setFirstName(String firstName) {
-                log.infov("[Keycloak UserModel Adapter] Setting firstName: firstName={0}", firstName);
-                user.setFirstName(firstName);
-                userDataChanged = true;
-            }
-
-            @Override
-            public void setLastName(String lastName) {
-                log.infov("[Keycloak UserModel Adapter] Setting lastName: lastName={0}", lastName);
-                user.setLastName(lastName);
-                userDataChanged = true;
-            }
-
+//
+//            @Override
+//            public void setFirstName(String firstName) {
+//                log.infov("[Keycloak UserModel Adapter] Setting firstName: firstName={0}", firstName);
+//                user.setFirstName(firstName);
+//            }
+//
+//            @Override
+//            public void setLastName(String lastName) {
+//                log.infov("[Keycloak UserModel Adapter] Setting lastName: lastName={0}", lastName);
+//                user.setLastName(lastName);
+//            }
+//
             @Override
             public void setEmail(String email) {
                 log.infov("[Keycloak UserModel Adapter] Setting email: email={0}", email);
-                user.setEmail(email);
-                userDataChanged = true;
+//                user.setEmail(email);
+                super.setEmail(email);
             }
-
-            @Override
-            public void setSingleAttribute(String name, String value) {
-                log.infov("[Keycloak UserModel Adapter] Setting attribute {0} with value {1}", name, value);
-                getFederatedStorage().setSingleAttribute(realm, this.getId(), name, value);
-                userDataChanged = true;
-            }
+//
+//            @Override
+//            public void setSingleAttribute(String name, String value) {
+//                log.infov("[Keycloak UserModel Adapter] Setting attribute {0} with value {1}", name, value);
+//                getFederatedStorage().setSingleAttribute(realm, this.getId(), name, value);
+//            }
 
             @Override
             public void setAttribute(String name, List<String> values) {
@@ -172,20 +153,39 @@ public class FileUserStorageProvider implements
                     case "favouriteLine":
                         // purposely skip attribute setting to federatedStorage so it won't
                         // get captured by Keycloak's local DB and shown via the Admin console
+                        log.infov("Looking for user in repository: username={0}", username);
+                        User user = userRepository.getUser(username);
+                        if (user == null) {
+                            user = new User();
+                            log.infov("Adding user to repository: username={0}", username);
+                            user.setUsername(username);
+                            user.setPassword(username);
+                            userRepository.insertUser(user);
+                        }
+                        FileTransaction transaction = new FileTransaction(userRepository, user);
+
+                        ensureTransactionStarted(transaction);
+
                         user.setFavouriteLine(values.get(0));
                         break;
                     default:
                         getFederatedStorage().setAttribute(realm, this.getId(), name, values);
                 }
-                userDataChanged = true;
             }
         };
+    }
+
+    private void ensureTransactionStarted(FileTransaction transaction) {
+        if (transaction.getState() == FileTransaction.TransactionState.NOT_STARTED) {
+            log.infov("Enlisting user repository transaction ...");
+            session.getTransactionManager().enlistAfterCompletion(transaction);
+        }
     }
 
     @Override
     public UserModel getUserByEmail(String email, RealmModel realm) {
         log.infov("Looking up user via email: email={0} realm={1}", email, realm.getId());
-        return getUserByUsername(email.replace("@flyer.com", ""), realm);
+        return getUserByUsername(email, realm);
     }
     /* UserLookupProvider interface implementation (End) */
 
@@ -288,11 +288,7 @@ public class FileUserStorageProvider implements
     @Override
     public UserModel addUser(RealmModel realm, String username) {
         log.infov("Adding new user to file repository: username={0}", username);
-        User user = new User();
-        user.setUsername(username);
-        user.setPassword(username);
-        userRepository.insertUser(user);
-        UserModel userModel = createAdapter(realm, user);
+        UserModel userModel = createAdapter(realm, username);
         return userModel;
     }
 
