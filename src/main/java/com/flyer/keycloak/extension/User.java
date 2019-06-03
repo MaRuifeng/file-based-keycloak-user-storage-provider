@@ -22,8 +22,7 @@ public class User {
     private String firstName;
     private String lastName;
     private String email;
-    private String password;
-    private String favouriteLine; // custom attribute
+    private String favouriteLine; // custom attribute that CAN'T be stored and shown by Keycloak
 
     public User(String firstName, String lastName, String email, String favouriteLine) {
         this.firstName = firstName;
@@ -31,10 +30,5 @@ public class User {
         this.favouriteLine = favouriteLine;
         this.email = email;
         this.username = this.email.toLowerCase();
-        setPassword(this.username);
-    }
-
-    public void setPassword(String password) {
-        this.password = HashUtil.hashString(password);
     }
 }

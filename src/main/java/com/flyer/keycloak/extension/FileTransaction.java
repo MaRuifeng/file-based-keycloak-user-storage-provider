@@ -26,8 +26,7 @@ public class FileTransaction extends AbstractKeycloakTransaction {
     @Override
     protected void commitImpl() {
         log.infov("Updating user to external repository in a transaction.");
-        user.setPassword(user.getUsername()); // surely this needs to be more securely handled
-        log.infov("User to be updated into the repository: {0}", user.toString());
+        log.infov("User info: {0}", user.toString());
         userRepository.updateUser(user);
         try {
             userRepository.persistUserDataToFile();
