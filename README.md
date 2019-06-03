@@ -15,7 +15,7 @@ The `FileUserStorageProvider` implements [these provider capability interfaces](
 
 During development, this [problem](https://stackoverflow.com/questions/56272637/how-do-i-write-a-simple-transaction-wrapper-in-a-keycloak-spi-extension) was raised up as the author had little idea on how to persist user data back to the repository. 
 
-> Update by author
+> Update by author at a later stage
 
 A self-defined Keycloak transaction is enlisted after the main authentication transaction to persist user data. This occurs in the `setAttribute()` method of the user model adapter. 
 
