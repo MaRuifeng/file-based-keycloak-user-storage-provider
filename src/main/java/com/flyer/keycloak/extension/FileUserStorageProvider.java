@@ -1,6 +1,5 @@
 package com.flyer.keycloak.extension;
 
-import lombok.Getter;
 import lombok.extern.jbosslog.JBossLog;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.credential.CredentialInput;
@@ -10,6 +9,7 @@ import org.keycloak.models.*;
 import org.keycloak.models.utils.UserModelDelegate;
 import org.keycloak.storage.StorageId;
 import org.keycloak.storage.UserStorageProvider;
+import org.keycloak.storage.user.ImportedUserValidation;
 import org.keycloak.storage.user.UserLookupProvider;
 import org.keycloak.storage.user.UserQueryProvider;
 import org.keycloak.storage.user.UserRegistrationProvider;
@@ -31,7 +31,8 @@ public class FileUserStorageProvider implements
         UserLookupProvider,
         CredentialInputValidator,
         UserQueryProvider,
-        UserRegistrationProvider {
+        UserRegistrationProvider,
+        ImportedUserValidation {
     private final KeycloakSession session;
     private final ComponentModel model; // represents how the provider is enabled and configured within a specific realm
     private final FileUserRepository userRepository;
@@ -69,15 +70,11 @@ public class FileUserStorageProvider implements
         log.infov("Looking up user via username: username={0} realm={1}", username, realm.getId());
         UserModel adapter = loadedUsers.get(username);
         if (adapter == null) {
-            log.infov("Number of users in local storage: {0}", session.userLocalStorage().getUsersCount(realm));
-            session.userLocalStorage().getUsers(realm, 0, Integer.MAX_VALUE).stream().forEach(user -> log.infov("User in local storage: {0}", user.getUsername()));
-            UserModel localUser = session.userLocalStorage().getUserByUsername(username, realm);
-            if (localUser != null) {
-                log.infov("Found user in local storage: {0}", localUser.getUsername());
-                localUser.getAttributes().forEach((key, value) -> log.infov("{0} : {1}", key, value));
-                adapter = createAdapter(realm, localUser, null);
+            User user = userRepository.getUser(username);
+            if (user != null) {
+                adapter = createAdapter(realm, user);
                 loadedUsers.put(username, adapter);
-            } else log.infov("No such user found in local storage: {0}", username);
+            }
         }
         return adapter;
     }
@@ -187,16 +184,12 @@ public class FileUserStorageProvider implements
     /* UserRegistrationProvider interface implementation (Start) */
     @Override
     public UserModel addUser(RealmModel realm, String username) {
-        log.infov("Adding user to local storage: {0}", username);
-        UserModel localUser = session.userLocalStorage().addUser(realm, username);
-        localUser.setFederationLink(model.getId());
-
         log.infov("Adding new user to file repository: username={0}", username);
         User user = new User();
         user.setUsername(username);
         user.setPassword(username);
         userRepository.insertUser(user);
-        UserModel userModel = createAdapter(realm, localUser, user);
+        UserModel userModel = createAdapter(realm, user);
         return userModel;
     }
 
@@ -214,7 +207,22 @@ public class FileUserStorageProvider implements
     }
     /* UserRegistrationProvider interface implementation (End) */
 
-    private UserModel createAdapter(RealmModel realm, UserModel localUser, User user) {
+    private UserModel createAdapter(RealmModel realm, User user) {
+        log.infov("Number of users in local storage: {0}", session.userLocalStorage().getUsersCount(realm));
+        session.userLocalStorage().getUsers(realm, 0, Integer.MAX_VALUE)
+                .stream().forEach(u -> log.infov("User in local storage: {0}", u.getUsername()));
+
+        UserModel localUser = session.userLocalStorage().getUserByUsername(user.getUsername(), realm);
+
+        if (localUser == null) {
+            log.infov("Adding user to local storage: {0}", user.getUsername());
+            localUser = session.userLocalStorage().addUser(realm, user.getUsername());
+            localUser.setFederationLink(model.getId());
+        } else {
+            log.infov("Found user in local storage: {0}", localUser.getUsername());
+            localUser.getAttributes().forEach((key, value) -> log.infov("Attribute - {0} : {1}", key, value));
+        }
+
         return new UserModelDelegate(localUser) {
             @Override
             public void setAttribute(String name, List<String> values) {
@@ -250,4 +258,18 @@ public class FileUserStorageProvider implements
             }
         };
     }
+
+    /* ImportedUserValidation interface implementation (Start) */
+    @Override
+    public UserModel validate(RealmModel realm, UserModel user) {
+        return new UserModelDelegate(user) {
+            @Override
+            public void setAttribute(String name, List<String> values) {
+                // do nothing as we are using a delegate to let this custom storage provider
+                // to proxy imported users and disable their attribute setting
+            }
+        };
+    }
+
+    /* ImportedUserValidation interface implementation (End) */
 }

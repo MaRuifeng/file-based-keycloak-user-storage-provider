@@ -6,14 +6,19 @@ The built-in [LDAP](https://github.com/keycloak/keycloak/blob/b478472b3578b8980d
 This example demonstrates how to write such an extension using a JSON file based user repository as the external user & credential database. The JSON file will be created as `userDB.json` under the user's home directory the first time this extension is run.
 
 The code base is developed by extending the example given in this [documentation](https://access.redhat.com/documentation/en-us/red_hat_single_sign-on/7.1/html/server_developer_guide/user-storage-spi) from RedHat. 
-By following the factory design pattern, a `FileUserStorageProviderFactory` creates a `FileUserStorageProvider` instance in each Keycloak transaction, which further leverages a `UserModel` instance as an adapter to bridge to the custom user model defined in the file based repository. 
+By following the factory design pattern, a `FileUserStorageProviderFactory` creates a `FileUserStorageProvider` instance in each Keycloak transaction, which further leverages a `UserModel` instance as an adapter to bridge to the custom user model defined in the file based repository.
+This `UserModel` instance is created by inheriting the abstract `AbstractUserAdapterFederatedStorage` class, [which](https://access.redhat.com/documentation/en-us/red_hat_single_sign-on/7.1/html/server_developer_guide/user-storage-spi#augmenting_external_storage) is intended to store additional attributes and role mapping etc. in Keycloak's federated storage.  
 
 The `FileUserStorageProvider` implements [these provider capability interfaces](https://access.redhat.com/documentation/en-us/red_hat_single_sign-on/7.1/html/server_developer_guide/user-storage-spi#provider_capability_interfaces) to enable user lookup & update, authentication, query, registration & removal. 
 
 ## Technical discussions
 
-During development, this [problem](https://stackoverflow.com/questions/56272637/how-do-i-write-a-simple-transaction-wrapper-in-a-keycloak-spi-extension) was raised up as the author had little idea on how to persist user data back to the repository. An awkward attempt is recorded in the `transaction` branch where a self-defined Keycloak transaction is enlisted after the main authentication transaction to persist user data. 
-In the `main` branch, data persistence occurs in the `close()` method of the `UserLookUpProvider` interface, which is only invoked at the end of the main transaction.
+During development, this [problem](https://stackoverflow.com/questions/56272637/how-do-i-write-a-simple-transaction-wrapper-in-a-keycloak-spi-extension) was raised up as the author had little idea on how to persist user data back to the repository. 
+
+> Update by author at a later stage
+
+A self-defined Keycloak transaction is enlisted after the main authentication transaction to persist user data. This occurs in the `setAttribute()` method of the user model adapter. 
+
 
 ## Build
 
