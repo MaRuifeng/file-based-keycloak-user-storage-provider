@@ -6,19 +6,28 @@ The built-in [LDAP](https://github.com/keycloak/keycloak/blob/b478472b3578b8980d
 This example demonstrates how to write such an extension using a JSON file based user repository as the external user & credential database. The JSON file will be created as `userDB.json` under the user's home directory the first time this extension is run.
 
 The code base is developed by extending the example given in this [documentation](https://access.redhat.com/documentation/en-us/red_hat_single_sign-on/7.1/html/server_developer_guide/user-storage-spi) from RedHat. 
-By following the factory design pattern, a `FileUserStorageProviderFactory` creates a `FileUserStorageProvider` instance in each Keycloak transaction, which further leverages a `UserModel` instance as an adapter to bridge to the custom user model defined in the file based repository.
-This `UserModel` instance is created by inheriting the abstract `AbstractUserAdapterFederatedStorage` class, [which](https://access.redhat.com/documentation/en-us/red_hat_single_sign-on/7.1/html/server_developer_guide/user-storage-spi#augmenting_external_storage) is intended to store additional attributes and role mapping etc. in Keycloak's federated storage.  
+By following the factory design pattern, a `FileUserStorageProviderFactory` creates a `FileUserStorageProvider` instance in each Keycloak transaction, which further leverages a `UserModel` instance as an adapter to bridge to the custom user model defined in the file based repository.  
 
 The `FileUserStorageProvider` implements [these provider capability interfaces](https://access.redhat.com/documentation/en-us/red_hat_single_sign-on/7.1/html/server_developer_guide/user-storage-spi#provider_capability_interfaces) to enable user lookup & update, authentication, query, registration & removal. 
 
 ## Technical discussions
 
 During development, this [problem](https://stackoverflow.com/questions/56272637/how-do-i-write-a-simple-transaction-wrapper-in-a-keycloak-spi-extension) was raised up as the author had little idea on how to persist user data back to the repository. 
-
+As a coarse solution, the author decided to put file data persistence step in the `close()` method which executes at the end of a transaction. This code can be found in the `import_strategy` branch.
 > Update by author at a later stage
 
-A self-defined Keycloak transaction is enlisted after the main authentication transaction to persist user data. This occurs in the `setAttribute()` method of the user model adapter. 
+A self-defined Keycloak transaction is enlisted after the main authentication transaction to persist user data. This occurs in the `setAttribute()` method of the user model adapter, found in both the `master` and `demo` branches. 
 
+### Federated user storage implementation
+
+This implementation is found in the `master` branch. It leverages the [federated user storage](https://access.redhat.com/documentation/en-us/red_hat_single_sign-on/7.1/html/server_developer_guide/user-storage-spi#augmenting_external_storage) feature provided by Keycloak, and only stores additional attributes and role mappings etc. that cannot be handled by the external storage into the local database.
+A `UserModel` instance is created by inheriting the abstract `AbstractUserAdapterFederatedStorage` class, which provides customized getters and setters to manage user data via either federated or external storage, or both. 
+The `demo` branch shows how certain attributes can be skipped by the federated user storage by overriding the `setAttribute()` method. 
+
+###  Import strategy implementation
+
+This implementation is found in the `import_strategy` branch. It leverages the [user import](https://access.redhat.com/documentation/en-us/red_hat_single_sign-on/7.1/html/server_developer_guide/user-storage-spi#import_implementation_strategy) feature provided by Keycloak and creates a local copy of each user in its own database. 
+The `ImportedUserValidationInterface` provides a way to delegate imported users and override their default behavior. In this example, there is a requirement that further attribute setting needs to be avoided on imported users, hence the `setAttribute()` function is overridden to avoid that.  
 
 ## Build
 
@@ -40,7 +49,7 @@ Suppose there is a web application that leverages this Keycloak server for ident
 * Successful login with such users
 * Brokered external SAML/OIDC identify provider
     * Logged-in users get loaded/updated into Keyloak's internal user database as well as the file based repository
-    * Non-common attributes (e.g. `favouriteLine` in this code repo) are successfully managed as long as they are mapped correctly
+    * Non-common attributes (e.g. `favouriteLine` in this code repo) are successfully managed (skip setting when needed) as long as they are mapped correctly
 * Once a user record is removed via the admin console, it also gets deleted from the file based repository
   
 ## Author
